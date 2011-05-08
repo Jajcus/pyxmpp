@@ -12,8 +12,8 @@ if not d:
 os.chdir(d)
 
 print "Checking for python version...", sys.version.replace("\n", " ")
-if sys.hexversion < 0x02030000:
-    print >>sys.stderr, "ERROR: Python 2.3 or newer is required"
+if sys.hexversion < 0x02060000:
+    print >>sys.stderr, "ERROR: Python 2.6 or newer is required"
     sys.exit(1)
 
 print "Checking for dnspython...",
@@ -35,16 +35,6 @@ except ImportError:
     sys.exit(1)
 print "found"
     
-print "Checking for M2Crypto...",
-try:
-    from M2Crypto import SSL
-    from M2Crypto.SSL import SSLError
-    import M2Crypto.SSL.cb
-    print "version %s found. Hope it will work." % (M2Crypto.version,)
-except ImportError:
-    print "not found"
-    print >>sys.stderr, "Warning: You need M2Crypto (some good version) for StartTLS support in PyXMPP"
-
 print "Trying to build the binary extension...",
 build_cfg = file("build.cfg", "w")
 print >>build_cfg, "python_only = False"

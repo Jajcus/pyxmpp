@@ -1,5 +1,9 @@
 CHANGES.html
 ChangeLog.html
-doc-tstamp
 index.html
-www/
+doc-tstamp
+www/api/
+www/pyxmpp.html
+www/CHANGES.html
+www/ChangeLog.html
+www/style.css

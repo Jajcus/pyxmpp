@@ -3,7 +3,7 @@ EPYDOC=epydoc
 .PHONY: all doc update-doc clean check-epydoc check-docutils \
 	pyxmpp.xmi pyxmpp-auto.xmi
 
-WEBFILES=www/index.html www/CHANGES.html www/ChangeLog.html \
+WEBFILES=www/pyxmpp.html www/CHANGES.html www/ChangeLog.html \
 	www/style.css
 
 RST2HTML=rst2html
@@ -69,6 +69,13 @@ ChangeLog.html: ../ChangeLog
 
 www/%.html: %.html template.html
 	../auxtools/htmlmerge.py template.html $*.html \
+	  | xmllint --nsclean - | sed -e's/name="\([^"]*\)" id="\1"/name="\1"/g' > $@
+
+www/index.html:
+
+
+www/pyxmpp.html: index.html template.html
+	../auxtools/htmlmerge.py template.html index.html \
 	  | xmllint --nsclean - | sed -e's/name="\([^"]*\)" id="\1"/name="\1"/g' > $@
 
 clean:

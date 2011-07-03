@@ -14,6 +14,13 @@ extensions. PyXMPP provides building blocks for creating Jabber clients and
 components. Developer uses them to setup XMPP streams, handle incoming events
 and create outgoing stanzas (XMPP "packets").
 
+Please note: this project is becoming obsolete, as now `PyXMPP2`_
+is being developed. PyXMPP2 is a modern rewrite of PyXMPP, using ElementTree
+instead of libxml2.
+
+.. _PyXMPP2: https://github.com/Jajcus/pyxmpp2
+
+
 Features
 --------
 

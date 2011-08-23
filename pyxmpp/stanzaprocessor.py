@@ -264,6 +264,12 @@ class StanzaProcessor:
         self.fix_in_stanza(stanza)
         to=stanza.get_to()
 
+        if to and to.node == None and (not self.me
+                                        or to.domain == self.me.domain):
+            # workaround for OpenFire bug
+            # http://community.igniterealtime.org/thread/35966
+            to = None
+
         if not self.process_all_stanzas and to and to!=self.me and to.bare()!=self.me.bare():
             return self.route_stanza(stanza)
 

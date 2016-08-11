@@ -15,10 +15,11 @@
 # Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 #
 
-"""Delayed delivery mark (jabber:x:delay) handling.
+"""Delayed delivery mark (urn:xmpp:delay and jabber:x:delay) handling.
 
 Normative reference:
   - `JEP 91 <http://www.jabber.org/jeps/jep-0091.html>`__
+  - `XEP 0203 <http://xmpp.org/extensions/xep-0203.html>`__
 """
 
 __docformat__="restructuredtext en"
@@ -35,13 +36,26 @@ from pyxmpp.utils import datetime_utc_to_local,datetime_local_to_utc
 from pyxmpp.objects import StanzaPayloadObject
 from pyxmpp.exceptions import BadRequestProtocolError, JIDMalformedProtocolError, JIDError
 
-DELAY_NS="jabber:x:delay"
+DELAY_NS = "urn:xmpp:delay"
+LEGACY_DELAY_NS = "jabber:x:delay"
+
+def _parse_ts(timestamp):
+    if "." in timestamp and timestamp.endswith("Z"):
+        # strip miliseconds
+        timestamp = timestamp.split(".", 1)[0] + "Z"
+    for fmt in ("%Y-%m-%dT%H:%M:%SZ", "%Y%m%dT%H:%M:%S"):
+        try:
+            result = time.strptime(timestamp, fmt)
+            return result
+        except ValueError:
+            continue
+    raise BadRequestProtocolError, "Bad timestamp: " + repr(timestamp)
 
 class Delay(StanzaPayloadObject):
     """
     Delayed delivery tag.
 
-    Represents 'jabber:x:delay' (JEP-0091) element of a Jabber stanza.
+    Represents 'urn:xmpp:delay' (XEP-0203) element of a Jabber stanza.
 
     :Ivariables:
         - `delay_from`: the "from" value of the delay element
@@ -49,8 +63,11 @@ class Delay(StanzaPayloadObject):
         - `timestamp`: the UTC timestamp as naive datetime object
     """
 
-    xml_element_name = "x"
+    xml_element_name = "delay"
     xml_element_namespace = DELAY_NS
+
+    _sort_order = 1
+    _time_format = "%Y-%m-%dT%H:%M:%SZ"
 
     def __init__(self,node_or_datetime,delay_from=None,reason=None,utc=True):
         """
@@ -89,17 +106,11 @@ class Delay(StanzaPayloadObject):
         if xmlnode.type!="element":
             raise ValueError,"XML node is not a jabber:x:delay element (not an element)"
         ns=get_node_ns_uri(xmlnode)
-        if ns and ns!=DELAY_NS or xmlnode.name!="x":
-            raise ValueError,"XML node is not a jabber:x:delay element"
+        if ns and (ns != self.xml_element_namespace
+                or xmlnode.name != self.xml_element_name):
+            raise ValueError,"XML node is not a " + self.xml_element_namespace + " element"
         stamp=xmlnode.prop("stamp")
-        if stamp.endswith("Z"):
-            stamp=stamp[:-1]
-        if "-" in stamp:
-            stamp=stamp.split("-",1)[0]
-        try:
-            tm = time.strptime(stamp, "%Y%m%dT%H:%M:%S")
-        except ValueError:
-            raise BadRequestProtocolError, "Bad timestamp"
+        tm = _parse_ts(stamp)
         tm=tm[0:8]+(0,)
         self.timestamp=datetime.datetime.fromtimestamp(time.mktime(tm))
         delay_from=from_utf8(xmlnode.prop("from"))
@@ -107,7 +118,7 @@ class Delay(StanzaPayloadObject):
             try:
                 self.delay_from = JID(delay_from)
             except JIDError:
-                raise JIDMalformedProtocolError, "Bad JID in the jabber:x:delay 'from' attribute"
+                raise JIDMalformedProtocolError, "Bad JID in the " + self.xml_element_namespace + " 'from' attribute"
         else:
             self.delay_from = None
         self.reason = from_utf8(xmlnode.getContent())
@@ -124,7 +135,7 @@ class Delay(StanzaPayloadObject):
         :Types:
             - `xmlnode`: `libxml2.xmlNode`
             - `_unused`: `libxml2.xmlDoc`"""
-        tm=self.timestamp.strftime("%Y%m%dT%H:%M:%S")
+        tm=self.timestamp.strftime(self._time_format)
         xmlnode.setProp("stamp",tm)
         if self.delay_from:
             xmlnode.setProp("from",self.delay_from.as_utf8())
@@ -153,8 +164,27 @@ class Delay(StanzaPayloadObject):
         n.freeNode()
         return r
 
-    def __cmp__(self,other):
-        return cmp(timestamp, other.timestamp)
+    def __cmp__(self, other):
+        return cmp((self._sort_order, self.timestamp),
+                    (other._sort_order, other.timestamp))
+
+class LegacyDelay(Delay):
+    """
+    Delayed delivery tag.
+
+    Represents 'jabber:x:delay' (JEP-0091) element of a Jabber stanza.
+
+    :Ivariables:
+        - `delay_from`: the "from" value of the delay element
+        - `reason`: the "reason" (content) of the delay element
+        - `timestamp`: the UTC timestamp as naive datetime object
+    """
+
+    xml_element_name = "x"
+    xml_element_namespace = LEGACY_DELAY_NS
+
+    _sort_order = 2
+    _time_format = "%Y%m%dT%H:%M:%S"
 
 def get_delays(stanza):
     """Get jabber:x:delay elements from the stanza.
@@ -169,8 +199,11 @@ def get_delays(stanza):
     delays=[]
     n=stanza.xmlnode.children
     while n:
-        if n.type=="element" and get_node_ns_uri(n)==DELAY_NS and n.name=="x":
-            delays.append(Delay(n))
+        if n.type=="element":
+            if get_node_ns_uri(n) == DELAY_NS and n.name == "delay":
+                delays.append(Delay(n))
+            elif get_node_ns_uri(n) == LEGACY_DELAY_NS and n.name == "x":
+                delays.append(LegacyDelay(n))
         n=n.next
     delays.sort()
     return delays
